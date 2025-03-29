@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Interview Conversation - Video Style</title>
+  <style>
+    /* Base resets and full-screen background */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: Arial, sans-serif;
+    }
+    /* Outer container centering the video player and warning message */
+    .outer-wrapper {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    /* Video container with 16:9 ratio and background image */
+    .video-container {
+      position: relative;
+      width: 80%;
+      max-width: 1000px;
+      background: #000 url("https://storage.googleapis.com/vdbimagesbucket/Screenshot%202025-03-25%20at%209.35.00%E2%80%AFPM.png") center center/cover no-repeat;
+      padding-bottom: 56.25%; /* 16:9 ratio */
+      overflow: hidden;
+      border: 1px solid #333;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    /* Overlay for play/pause button and hidden controls */
+    .content-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+    /* Play/Pause button styling */
+    #playPauseBtn {
+      pointer-events: auto;
+      background-color: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 2rem;
+      font-weight: bold;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      width: 80px;
+      height: 80px;
+      cursor: pointer;
+      text-align: center;
+      line-height: 72px;
+      transition: background-color 0.3s;
+      display: block;
+    }
+    #playPauseBtn:hover:not(:disabled) {
+      background-color: rgba(0,0,0,0.8);
+    }
+    #playPauseBtn:disabled {
+      background-color: rgba(100,100,100,0.5);
+      cursor: not-allowed;
+    }
+    /* Hidden controls */
+    .voice-section,
+    #stopBtn,
+    #downloadBtn,
+    #conversation,
+    #status {
+      display: none;
+    }
+    /* Error/Warning message styling */
+    #errorMessage,
+    #tabWarning {
+      display: none;
+      color: #555;
+      font-size: 1rem;
+      margin-top: 10px;
+      text-align: center;
+    }
+    /* Browser warning overlay */
+    #browserWarning {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.9);
+      color: #fff;
+      font-size: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #browserWarning button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    /* Talk bubbles for captions */
+    #interviewerCaption {
+      position: absolute;
+      top: 6%;
+      left: 0%;
+      width: 30%;
+      background: #40826D;
+      color: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      pointer-events: none;
+      font-size: 0.9rem;
+      display: none;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    #candidateCaption {
+      position: absolute;
+      top: 5%;
+      right: 0%;
+      width: 30%;
+      background: #F9C95D;
+      color: #000;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      pointer-events: none;
+      font-size: 0.9rem;
+      display: none;
+      box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    /* Transcript container styles */
+    .transcript-container {
+      margin: 20px auto;
+      max-width: 1000px;
+      padding: 20px;
+      background-color: #f7f7f7;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-family: Arial, sans-serif;
+    }
+    .transcript-container h2 {
+      text-align: center;
+      color: #555;
+      margin-bottom: 20px;
+    }
+    .transcript-message {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 6px;
+      max-width: 45%;
+      clear: both;
+      word-wrap: break-word;
+    }
+    .transcript-message.assistant {
+      background-color: #e3f2fd;
+      text-align: left;
+      float: left;
+    }
+    .transcript-message.user {
+      background-color: #e8f5e9;
+      text-align: right;
+      float: right;
+    }
+    .transcript-message.system {
+      background-color: #fce4ec;
+      text-align: center;
+      margin: 0 auto;
+      max-width: 90%;
+    }
+    /* Clearfix for transcript container */
+    .transcript-container::after {
+      content: "";
+      display: table;
+      clear: both;
+    }
+  </style>
+</head>
+<body>
+  <!-- Browser Compatibility Warning Overlay -->
+  <div id="browserWarning" style="display: none;">
+    <p>This video is compatible to play only on the Chrome browser.</p>
+    <button id="dismissWarningBtn">OK</button>
+  </div>
+
+  <div class="outer-wrapper">
+    <div class="video-container" id="videoContainer">
+      <div class="content-overlay">
+        <!-- Play/Pause button; initially visible -->
+        <button id="playPauseBtn">▶</button>
+        <!-- Voice selection (hidden) -->
+        <div class="voice-section">
+          <select id="voiceSelectOne"></select>
+          <select id="voiceSelectTwo"></select>
+        </div>
+        <button id="stopBtn">Stop Conversation</button>
+        <button id="downloadBtn">Download Interview HTML</button>
+      </div>
+      <!-- Caption bubbles -->
+      <div id="interviewerCaption"></div>
+      <div id="candidateCaption"></div>
+      <!-- Hidden conversation transcript log -->
+      <div id="conversation"></div>
+      <p id="status">Idle...</p>
+      <p id="errorMessage"></p>
+    </div>
+    <!-- Tab Warning Element -->
+    <p id="tabWarning">Warning: Changing tabs during the interview may stop the interview.</p>
+  </div>
+
+  <!-- New Transcript Container for Live Conversation Display -->
+  <div class="transcript-container">
+    <h2>Interview Transcript</h2>
+    <div id="transcriptBox"></div>
+  </div>
+
+  <script>
+    /*------------------------------------------------
+     * JOB TITLE PLACEHOLDER SETUP
+     *------------------------------------------------
+     * Listen for a postMessage event from the parent containing a job title.
+     */
+    let currentJobTitle = "";
+    window.addEventListener("message", function(event) {
+      if (event.data && event.data.jobTitle) {
+        currentJobTitle = event.data.jobTitle;
+        console.log("Received job title in HTML code:", currentJobTitle);
+      }
+    });
+
+    /*------------------------------------------------
+     * CONFIG & GLOBALS
+     *------------------------------------------------*/
+    const INTERVIEWER_ENDPOINT = "https://travel.storieswhiletravelling.com/api";
+    const MAIN_ENDPOINT = "https://candidate.storieswhiletravelling.com/api";
+
+    // UI Elements
+    const playPauseBtn = document.getElementById("playPauseBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const conversationEl = document.getElementById("conversation");
+    const statusEl = document.getElementById("status");
+    const errorEl = document.getElementById("errorMessage");
+    const videoContainer = document.getElementById("videoContainer");
+    const browserWarning = document.getElementById("browserWarning");
+    const dismissWarningBtn = document.getElementById("dismissWarningBtn");
+    const tabWarningEl = document.getElementById("tabWarning");
+
+    // Caption bubbles
+    const interviewerCaptionEl = document.getElementById("interviewerCaption");
+    const candidateCaptionEl = document.getElementById("candidateCaption");
+
+    // Voice selection elements
+    const voiceSelectOne = document.getElementById("voiceSelectOne");
+    const voiceSelectTwo = document.getElementById("voiceSelectTwo");
+
+    // Transcript container element
+    const transcriptBox = document.getElementById("transcriptBox");
+
+    // Conversation Control
+    let isConversationActive = false;
+    let isPaused = false;
+    let conversationTurn = 0;
+    const MAX_TURNS = 29;
+    let conversationStartTime = null;
+    let timeoutHandle = null;
+
+    // Global conversation history
+    const conversationHistory = [];
+
+    // Voices-related
+    let voices = [];
+    let selectedVoiceOne = null; // Interviewer (male voice)
+    let selectedVoiceTwo = null; // Candidate (female voice)
+
+    /*------------------------------------------------
+     * BROWSER COMPATIBILITY & VISIBILITY CHECK
+     *------------------------------------------------*/
+    const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
+    if (!isChrome) {
+      browserWarning.style.display = "flex";
+      playPauseBtn.disabled = true;
+      videoContainer.style.pointerEvents = "none";
+    }
+    dismissWarningBtn.addEventListener("click", () => {
+      browserWarning.style.display = "none";
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        tabWarningEl.style.display = "block";
+        if (isConversationActive) {
+          stopConversation("The conversation has been stopped because the tab became inactive.");
+        }
+      }
+    });
+
+    /*------------------------------------------------
+     * EVENT LISTENERS
+     *------------------------------------------------*/
+    playPauseBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      console.log("Play/Pause button clicked, currentJobTitle:", currentJobTitle);
+      if (!isConversationActive) {
+        startConversation();
+      } else {
+        togglePlayPause();
+      }
+    });
+    stopBtn.addEventListener("click", stopConversation);
+    downloadBtn.addEventListener("click", downloadInterviewHTML);
+    window.addEventListener('beforeunload', () => {
+      speechSynthesis.cancel();
+    });
+    voiceSelectOne.addEventListener("change", () => {
+      const index = voiceSelectOne.selectedOptions[0]?.getAttribute("data-voice-index");
+      selectedVoiceOne = voices[index] || null;
+    });
+    voiceSelectTwo.addEventListener("change", () => {
+      const index = voiceSelectTwo.selectedOptions[0]?.getAttribute("data-voice-index");
+      selectedVoiceTwo = voices[index] || null;
+    });
+    initializeVoices();
+
+    /*------------------------------------------------
+     * VOICE INITIALIZATION
+     *------------------------------------------------
+     * Use the original logic to find "Google UK English Male" or a matching en‑GB male voice
+     * for the interviewer and the corresponding female voice for the candidate.
+     */
+    function initializeVoices() {
+      voices = window.speechSynthesis.getVoices();
+      if (voices.length !== 0) {
+        const ukMaleVoice = voices.find(voice => voice.name === "Google UK English Male") ||
+                            voices.find(voice => voice.lang.startsWith("en-GB") && voice.name.toLowerCase().includes("male"));
+        selectedVoiceOne = ukMaleVoice || voices[0];
+        const ukFemaleVoice = voices.find(voice => voice.name === "Google UK English Female") ||
+                              voices.find(voice => voice.lang.startsWith("en-GB") && voice.name.toLowerCase().includes("female"));
+        selectedVoiceTwo = ukFemaleVoice || voices[0];
+        populateVoiceList(voiceSelectOne, selectedVoiceOne);
+        populateVoiceList(voiceSelectTwo, selectedVoiceTwo);
+      } else {
+        window.speechSynthesis.onvoiceschanged = () => {
+          voices = window.speechSynthesis.getVoices();
+          const ukMaleVoice = voices.find(voice => voice.name === "Google UK English Male") ||
+                              voices.find(voice => voice.lang.startsWith("en-GB") && voice.name.toLowerCase().includes("male"));
+          selectedVoiceOne = ukMaleVoice || voices[0];
+          const ukFemaleVoice = voices.find(voice => voice.name === "Google UK English Female") ||
+                                voices.find(voice => voice.lang.startsWith("en-GB") && voice.name.toLowerCase().includes("female"));
+          selectedVoiceTwo = ukFemaleVoice || voices[0];
+          populateVoiceList(voiceSelectOne, selectedVoiceOne);
+          populateVoiceList(voiceSelectTwo, selectedVoiceTwo);
+        };
+      }
+    }
+
+    function populateVoiceList(selectEl, defaultVoice) {
+      selectEl.innerHTML = "";
+      voices.forEach((voice, index) => {
+        const option = document.createElement("option");
+        option.textContent = `${voice.name} (${voice.lang})`;
+        option.setAttribute("data-voice-index", index);
+        if (voice === defaultVoice) {
+          option.selected = true;
+        }
+        selectEl.appendChild(option);
+      });
+      if (!selectEl.options.length) {
+        const option = document.createElement("option");
+        option.textContent = "No voices available";
+        selectEl.appendChild(option);
+        selectEl.disabled = true;
+      }
+    }
+
+    /*------------------------------------------------
+     * MAIN CONVERSATION FLOW
+     *------------------------------------------------
+     * Uses currentJobTitle received via postMessage.
+     */
+    async function startConversation() {
+      console.log("startConversation triggered with jobTitle:", currentJobTitle);
+      const jobRole = currentJobTitle.trim();
+      if (!jobRole) {
+        alert("Job title not provided.");
+        return;
+      }
+      isConversationActive = true;
+      isPaused = false;
+      conversationTurn = 0;
+      conversationStartTime = Date.now();
+      statusEl.textContent = "Conversation Started";
+      errorEl.textContent = "";
+      playPauseBtn.style.display = "none";
+      stopBtn.disabled = false;
+      downloadBtn.disabled = true;
+      tabWarningEl.style.display = "none";
+
+      conversationHistory.length = 0;
+      const firstMessage = `I am applying for a ${jobRole}`;
+      // Add the candidate's initial message instantly to the hidden log and to the transcript box
+      addMessageToUI("Candidate", firstMessage, "user");
+      conversationHistory.push({ role: "user", content: firstMessage });
+      startTimeout();
+      sendMessage(INTERVIEWER_ENDPOINT, conversationHistory, "Interviewer");
+    }
+
+    function stopConversation(reason = "The conversation has been stopped.") {
+      if (!isConversationActive) return;
+      isConversationActive = false;
+      isPaused = false;
+      speechSynthesis.cancel();
+      playPauseBtn.style.display = "block";
+      playPauseBtn.textContent = "▶";
+      statusEl.textContent = "Conversation Stopped";
+      addMessageToUI("System", reason, "system");
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        timeoutHandle = null;
+      }
+    }
+
+    function startTimeout() {
+      const timeoutDuration = 12 * 60 * 1000; // 12 minutes
+      timeoutHandle = setTimeout(() => {
+        if (isConversationActive) {
+          stopConversation("Stopped after 12 minutes.");
+        }
+      }, timeoutDuration);
+    }
+
+    function togglePlayPause() {
+      if (!isConversationActive) return;
+      if (!isPaused) {
+        speechSynthesis.pause();
+        isPaused = true;
+        playPauseBtn.style.display = "block";
+        playPauseBtn.textContent = "▶";
+      } else {
+        speechSynthesis.resume();
+        isPaused = false;
+        playPauseBtn.style.display = "none";
+      }
+    }
+
+    /*------------------------------------------------
+     * SENDING/RECEIVING MESSAGES WITH RETRY LOGIC
+     *------------------------------------------------*/
+    async function sendMessage(serverUrl, history, serverLabel, retries = 3) {
+      if (!isConversationActive) return;
+      if (conversationTurn >= MAX_TURNS) {
+        stopConversation("Max conversation turns reached.");
+        return;
+      }
+      try {
+        let dataToSend = history;
+        if (serverUrl === INTERVIEWER_ENDPOINT) {
+          // The interviewer only needs to see the last user messages + all assistant messages
+          const assistantMessages = history.filter(msg => msg.role === "assistant");
+          const userMessages = history.filter(msg => msg.role === "user");
+          const lastUserMessages = userMessages.slice(-2);
+          dataToSend = [...assistantMessages, ...lastUserMessages];
+        } else {
+          // The candidate only needs the last few messages
+          dataToSend = history.slice(-4);
+        }
+        const response = await fetch(serverUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversation: dataToSend }),
+        });
+        if (!response.ok) {
+          let errorText = `HTTP ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorText += `: ${errorData.message || JSON.stringify(errorData)}`;
+          } catch {
+            const text = await response.text();
+            if (text) errorText += `: ${text}`;
+          }
+          throw new Error(errorText);
+        }
+        const data = await response.json();
+        if (!data.reply) throw new Error("Server reply missing 'reply' field.");
+        const sanitizedReply = sanitizeMessage(data.reply);
+
+        // Use speakText to deliver the reply word by word with live transcript update.
+        speakText(sanitizedReply, serverLabel, () => {
+          if (!isConversationActive) return;
+          conversationTurn++;
+          const role = (serverLabel === "Interviewer") ? "assistant" : "user";
+          conversationHistory.push({ role, content: sanitizedReply });
+          const nextServer = (serverUrl === INTERVIEWER_ENDPOINT) ? MAIN_ENDPOINT : INTERVIEWER_ENDPOINT;
+          const nextLabel = (nextServer === INTERVIEWER_ENDPOINT) ? "Interviewer" : "Candidate";
+          setTimeout(() => {
+            sendMessage(nextServer, conversationHistory, nextLabel);
+          }, 1000);
+        });
+      } catch (error) {
+        console.error("Error in sendMessage:", error);
+        errorEl.style.display = "block";
+        errorEl.textContent = `Error: ${error.message}`;
+        if (retries > 0 && isConversationActive) {
+          setTimeout(() => {
+            sendMessage(serverUrl, history, serverLabel, retries - 1);
+          }, 2000);
+        } else {
+          stopConversation("Stopped due to an error.");
+        }
+      }
+    }
+
+    function sanitizeMessage(text) {
+      return text.trim();
+    }
+
+    /*------------------------------------------------
+     * UI HELPERS
+     *------------------------------------------------*/
+    function addMessageToUI(sender, text, cssClass) {
+      const msgDiv = document.createElement("div");
+      msgDiv.classList.add("message", cssClass);
+      msgDiv.textContent = `${sender}: ${text}`;
+      conversationEl.appendChild(msgDiv);
+      conversationEl.scrollTop = conversationEl.scrollHeight;
+      
+      // For static messages (like the initial candidate message), add them directly to the transcript box.
+      const transcriptMsg = document.createElement("div");
+      transcriptMsg.classList.add("transcript-message", cssClass);
+      transcriptMsg.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      transcriptBox.appendChild(transcriptMsg);
+    }
+
+    /*------------------------------------------------
+     * SPEECH SYNTHESIS with Live Word-by-Word Transcript
+     *------------------------------------------------*/
+    function splitText(text, maxLength = 200) {
+      const sentences = text.match(/[^\.!\?]+[\.!\?]+/g);
+      if (!sentences) return [text];
+      const chunks = [];
+      let currentChunk = '';
+      sentences.forEach(sentence => {
+        if ((currentChunk + sentence).length > maxLength) {
+          if (currentChunk.length > 0) {
+            chunks.push(currentChunk.trim());
+            currentChunk = '';
+          }
+        }
+        currentChunk += sentence + ' ';
+      });
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+      }
+      return chunks;
+    }
+
+    // Updated speakText to update the live transcript word by word.
+    function speakText(text, voiceLabel, callback) {
+      const chunks = splitText(text, 200);
+      let index = 0;
+      const bubbleEl = (voiceLabel === "Interviewer") ? interviewerCaptionEl : candidateCaptionEl;
+      bubbleEl.style.display = "block";
+      
+      // Create a new live transcript element for this spoken message.
+      const liveTranscriptElem = document.createElement("div");
+      liveTranscriptElem.classList.add("transcript-message");
+      if (voiceLabel === "Interviewer") {
+        liveTranscriptElem.classList.add("assistant");
+      } else if (voiceLabel === "Candidate") {
+        liveTranscriptElem.classList.add("user");
+      }
+      transcriptBox.appendChild(liveTranscriptElem);
+      
+      let accumulatedText = "";
+      function speakNext() {
+        if (index < chunks.length) {
+          const chunk = chunks[index];
+          const utterance = new SpeechSynthesisUtterance(chunk);
+          if (voiceLabel === "Interviewer" && selectedVoiceOne) {
+            utterance.voice = selectedVoiceOne;
+          } else if (voiceLabel === "Candidate" && selectedVoiceTwo) {
+            utterance.voice = selectedVoiceTwo;
+          }
+          bubbleEl.textContent = "";
+          const words = chunk.split(" ");
+          let wordIndex = 0;
+          const intervalDuration = 300; // Adjust the speed as desired
+          const timer = setInterval(() => {
+            if (wordIndex < words.length) {
+              const word = words[wordIndex];
+              accumulatedText += (accumulatedText ? " " : "") + word;
+              bubbleEl.textContent = accumulatedText;
+              liveTranscriptElem.innerHTML = `<strong>${voiceLabel}:</strong> ${accumulatedText}`;
+              wordIndex++;
+            } else {
+              clearInterval(timer);
+              accumulatedText += " ";
+              index++;
+              speakNext();
+            }
+          }, intervalDuration);
+          utterance.onerror = (e) => {
+            console.error("Speech synthesis error:", e.error);
+            clearInterval(timer);
+            index++;
+            speakNext();
+          };
+          speechSynthesis.speak(utterance);
+        } else {
+          if (callback) callback();
+        }
+      }
+      speakNext();
+    }
+
+    /*------------------------------------------------
+     * DOWNLOAD FINAL HTML (Transcript)
+     *------------------------------------------------*/
+    function downloadInterviewHTML() {
+      let transcriptHTML = "";
+      conversationHistory.forEach(msg => {
+        const speaker = (msg.role === "assistant") ? "Interviewer" : 
+                        (msg.role === "user") ? "Candidate" : "System";
+        transcriptHTML += `<p><strong>${speaker}:</strong> ${msg.content}</p>\n`;
+      });
+      const finalHTML = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interview Transcript</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { color: #1b6f9a; }
+    p { margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <h1>Interview Transcript</h1>
+  ${transcriptHTML}
+</body>
+</html>`;
+      const blob = new Blob([finalHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "interview_transcript.html";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  </script>
+</body>
+</html>
