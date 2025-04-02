@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Screen Capture Recorder</title>
+  <meta charset="UTF-8">
+  <title>Screen Recording</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f8f9fa;
-      padding: 20px;
       text-align: center;
+      padding: 20px;
+      background: #f8f9fa;
     }
     button {
       padding: 10px 20px;
@@ -18,59 +18,79 @@
     }
     video {
       margin-top: 20px;
-      max-width: 100%;
+      max-width: 800px;
       border: 1px solid #333;
       border-radius: 6px;
     }
   </style>
 </head>
 <body>
-  <h1>Screen Capture Recorder</h1>
+  <h1>Screen Recording</h1>
+  <p>This page records your screen (video and audio). When prompted, select either “Entire Screen” or the window/tab where your interview is running (do not select this tab).</p>
   <button id="startBtn">Start Recording</button>
   <button id="stopBtn" disabled>Stop Recording</button>
   <video id="preview" controls autoplay muted></video>
   
   <script>
-    let recorder;
+    let mediaRecorder;
     let recordedChunks = [];
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const preview = document.getElementById('preview');
     
-    document.getElementById("startBtn").addEventListener("click", async () => {
+    startBtn.addEventListener('click', async () => {
       try {
+        // Request display media (will prompt the user)
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: true
         });
-        document.getElementById("preview").srcObject = stream;
-        
-        recorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp9" });
+        preview.srcObject = stream;
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
         recordedChunks = [];
         
-        recorder.ondataavailable = event => {
-          if (event.data.size > 0) recordedChunks.push(event.data);
+        mediaRecorder.ondataavailable = event => {
+          if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+          }
         };
         
-        recorder.onstop = () => {
-          const blob = new Blob(recordedChunks, { type: "video/webm" });
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
           const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
+          const a = document.createElement('a');
           a.href = url;
-          a.download = "screen_recording.webm";
+          a.download = 'screen_recording.webm';
+          a.style.display = 'none';
+          document.body.appendChild(a);
           a.click();
+          setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 100);
         };
         
-        recorder.start();
-        document.getElementById("startBtn").disabled = true;
-        document.getElementById("stopBtn").disabled = false;
-      } catch (err) {
-        console.error("Error starting screen recording:", err);
+        mediaRecorder.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+      } catch (error) {
+        console.error('Error starting recording:', error);
       }
     });
     
-    document.getElementById("stopBtn").addEventListener("click", () => {
-      recorder.stop();
-      document.getElementById("startBtn").disabled = false;
-      document.getElementById("stopBtn").disabled = true;
+    stopBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+      // Stop all tracks of the stream so that recording stops
+      const stream = preview.srcObject;
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
     });
   </script>
 </body>
 </html>
+
