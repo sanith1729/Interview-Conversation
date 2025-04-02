@@ -5,7 +5,7 @@
   <!-- Import Inter font from Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interview Conversation - Video Style with Recording</title>
+  <title>Interview Conversation - Video Style</title>
   <style>
     /* Base resets and full-screen background */
     html, body {
@@ -13,6 +13,7 @@
       padding: 0;
       height: 100%;
       width: 100%;
+      /* Use a system font stack, Inter will be used in captions explicitly */
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f8f9fa;
       color: #202123;
@@ -129,6 +130,7 @@
       pointer-events: none;
       display: none;
       z-index: 10;
+      /* Use Inter font for captions */
       font-family: 'Inter', sans-serif;
     }
     /* Interviewer caption bubble uses the image background */
@@ -277,11 +279,12 @@
     <div id="transcriptBox"></div>
   </div>
 
-  <!-- Hidden canvas used for recording the video container -->
-  <canvas id="recordCanvas" style="display: none;"></canvas>
-
-  <!-- Include html2canvas from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!--
+       NOTE: This code preserves your original conversation logic.
+       The only additions are the startScreenRecording() and stopScreenRecording() functions,
+       which use getDisplayMedia() to ask for screen–capture permission and record the UI.
+       These functions are integrated in startConversation() and stopConversation() respectively.
+  -->
 
   <script>
     /*------------------------------------------------
@@ -330,48 +333,43 @@
     let selectedVoiceTwo = null; // Candidate (female voice)
 
     /*------------------------------------------------
-     * RECORDING VARIABLES & FUNCTIONS
+     * SCREEN RECORDING FUNCTIONS
      *------------------------------------------------*/
-    // Canvas for recording
-    const recordCanvas = document.getElementById("recordCanvas");
-    const recordCtx = recordCanvas.getContext("2d");
-    recordCanvas.width = 1280;
-    recordCanvas.height = 720;
+    let screenRecorder;
+    let screenChunks = [];
 
-    // Capture the canvas stream at 30fps
-    const stream = recordCanvas.captureStream(30);
-    let mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp9" });
-    let recordedChunks = [];
-    let recordInterval;
-
-    mediaRecorder.ondataavailable = function(e) {
-      if (e.data.size > 0) recordedChunks.push(e.data);
-    };
-
-    mediaRecorder.onstop = function() {
-      const blob = new Blob(recordedChunks, { type: "video/webm" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "interview_video.webm";
-      a.click();
-    };
-
-    function startRecording() {
-      recordedChunks = [];
-      mediaRecorder.start();
-      // Continuously capture snapshots of the videoContainer
-      recordInterval = setInterval(() => {
-        html2canvas(videoContainer).then(canvasSnapshot => {
-          recordCtx.clearRect(0, 0, recordCanvas.width, recordCanvas.height);
-          recordCtx.drawImage(canvasSnapshot, 0, 0, recordCanvas.width, recordCanvas.height);
+    async function startScreenRecording() {
+      try {
+        // Request permission to capture the screen (video and audio)
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
         });
-      }, 1000/30); // Approximately 30fps
+        screenRecorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp9" });
+        screenChunks = [];
+        screenRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            screenChunks.push(event.data);
+          }
+        };
+        screenRecorder.onstop = () => {
+          const blob = new Blob(screenChunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "conversation_recording.webm";
+          a.click();
+        };
+        screenRecorder.start();
+      } catch (err) {
+        console.error("Error starting screen recording:", err);
+      }
     }
 
-    function stopRecording() {
-      clearInterval(recordInterval);
-      mediaRecorder.stop();
+    function stopScreenRecording() {
+      if (screenRecorder && screenRecorder.state !== "inactive") {
+        screenRecorder.stop();
+      }
     }
 
     /*------------------------------------------------
@@ -398,9 +396,11 @@
     /*------------------------------------------------
      * EVENT LISTENERS
      *------------------------------------------------*/
+    // Start Conversation button
     startConversationBtn.addEventListener("click", () => {
       startConversation();
     });
+    // Play/Pause button
     playPauseBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isConversationActive) {
@@ -479,9 +479,9 @@
         alert("Please enter a job title first.");
         return;
       }
-      // Start recording when conversation begins
-      startRecording();
-
+      // Start screen recording when conversation begins.
+      startScreenRecording();
+      
       isConversationActive = true;
       isPaused = false;
       conversationTurn = 0;
@@ -514,8 +514,8 @@
         clearTimeout(timeoutHandle);
         timeoutHandle = null;
       }
-      // Stop recording and trigger download of the video file
-      stopRecording();
+      // Stop screen recording and download the video file.
+      stopScreenRecording();
     }
 
     function startTimeout() {
@@ -729,8 +729,8 @@
                         (msg.role === "user") ? "Candidate" : "System";
         transcriptHTML += `<p><strong>${speaker}:</strong> ${msg.content}</p>\n`;
       });
-      const finalHTML = `
-<!DOCTYPE html>
+      const finalHTML = 
+`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
