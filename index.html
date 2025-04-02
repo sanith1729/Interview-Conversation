@@ -5,7 +5,7 @@
   <!-- Import Inter font from Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interview Conversation - Video Style</title>
+  <title>Interview Conversation - Video Style with Cropped Recording</title>
   <style>
     /* Base resets and full-screen background */
     html, body {
@@ -13,7 +13,6 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      /* Use a system font stack, Inter will be used in captions explicitly */
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f8f9fa;
       color: #202123;
@@ -130,7 +129,6 @@
       pointer-events: none;
       display: none;
       z-index: 10;
-      /* Use Inter font for captions */
       font-family: 'Inter', sans-serif;
     }
     /* Interviewer caption bubble uses the image background */
@@ -194,13 +192,11 @@
       max-width: 60%;
       word-wrap: break-word;
     }
-    /* Assistant (Interviewer) messages get a light gray background */
     .transcript-message.assistant {
       background-color: #f7f7f8;
       text-align: left;
       margin-right: auto;
     }
-    /* Candidate (User) messages use a black background with white text */
     .transcript-message.user {
       background-color: #000;
       color: #fff;
@@ -213,13 +209,11 @@
       max-width: 90%;
       background-color: #f6f8fa;
     }
-    /* Clearfix for transcript container */
     .transcript-container::after {
       content: "";
       display: table;
       clear: both;
     }
-    /* Conversation start styling */
     .conversation-start {
       margin-top: 20px;
       text-align: center;
@@ -234,6 +228,15 @@
       font-size: 1rem;
       margin-left: 10px;
     }
+    /* Live recording preview video */
+    #liveRecording {
+      margin: 20px auto;
+      display: block;
+      width: 80%;
+      max-width: 1000px;
+      border: 1px solid #333;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
@@ -246,9 +249,7 @@
   <div class="outer-wrapper">
     <div class="video-container" id="videoContainer">
       <div class="content-overlay">
-        <!-- Play/Pause button; initially visible -->
         <button id="playPauseBtn">▶</button>
-        <!-- Voice selection (hidden) -->
         <div class="voice-section">
           <select id="voiceSelectOne"></select>
           <select id="voiceSelectTwo"></select>
@@ -256,44 +257,36 @@
         <button id="stopBtn">Stop Conversation</button>
         <button id="downloadBtn">Download Interview HTML</button>
       </div>
-      <!-- Caption bubbles -->
       <div id="interviewerCaption"></div>
       <div id="candidateCaption"></div>
-      <!-- Hidden conversation transcript log -->
       <div id="conversation"></div>
       <p id="status">Idle...</p>
       <p id="errorMessage"></p>
     </div>
-    <!-- Conversation start input -->
     <div class="conversation-start">
       <input type="text" id="jobRole" placeholder="Enter job title to start conversation" />
       <button id="startConversationBtn">Start Conversation</button>
     </div>
-    <!-- Tab Warning Element -->
     <p id="tabWarning">Warning: Changing tabs during the interview may stop the interview.</p>
   </div>
 
-  <!-- Transcript Container for Live Conversation Display -->
   <div class="transcript-container">
     <h2>Interview Transcript</h2>
     <div id="transcriptBox"></div>
   </div>
 
-  <!--
-       NOTE: This code preserves your original conversation logic.
-       The only additions are the startScreenRecording() and stopScreenRecording() functions,
-       which use getDisplayMedia() to ask for screen–capture permission and record the UI.
-       These functions are integrated in startConversation() and stopConversation() respectively.
-  -->
+  <!-- Live preview of the cropped recording -->
+  <video id="liveRecording" controls autoplay muted></video>
 
+  <!-- The hidden canvas used for cropped recording will be created dynamically -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     /*------------------------------------------------
-     * CONFIG & GLOBALS
+     * GLOBAL VARIABLES FOR CONVERSATION (Unchanged)
      *------------------------------------------------*/
     const INTERVIEWER_ENDPOINT = "https://travel.storieswhiletravelling.com/api";
     const MAIN_ENDPOINT = "https://candidate.storieswhiletravelling.com/api";
 
-    // UI Elements
     const jobRoleInput = document.getElementById("jobRole");
     const startConversationBtn = document.getElementById("startConversationBtn");
     const playPauseBtn = document.getElementById("playPauseBtn");
@@ -308,67 +301,121 @@
     const tabWarningEl = document.getElementById("tabWarning");
     const transcriptBox = document.getElementById("transcriptBox");
 
-    // Caption bubbles
     const interviewerCaptionEl = document.getElementById("interviewerCaption");
     const candidateCaptionEl = document.getElementById("candidateCaption");
 
-    // Voice selection elements
     const voiceSelectOne = document.getElementById("voiceSelectOne");
     const voiceSelectTwo = document.getElementById("voiceSelectTwo");
 
-    // Conversation Control
     let isConversationActive = false;
     let isPaused = false;
     let conversationTurn = 0;
     const MAX_TURNS = 29;
     let conversationStartTime = null;
     let timeoutHandle = null;
-
-    // Global conversation history
     const conversationHistory = [];
-
-    // Voices-related
     let voices = [];
-    let selectedVoiceOne = null; // Interviewer (male voice)
-    let selectedVoiceTwo = null; // Candidate (female voice)
+    let selectedVoiceOne = null;
+    let selectedVoiceTwo = null;
 
     /*------------------------------------------------
-     * SCREEN RECORDING FUNCTIONS
+     * GLOBAL VARIABLES FOR CROPPED RECORDING
      *------------------------------------------------*/
-    let screenRecorder;
-    let screenChunks = [];
+    let displayStream = null;
+    let croppedRecorder = null;
+    let croppedChunks = [];
+    let recordingCanvas = null;
+    let recordingCtx = null;
+    let animationFrameId = null;
 
-    async function startScreenRecording() {
+    /*------------------------------------------------
+     * SCREEN RECORDING FUNCTIONS (CROPPED TO videoContainer)
+     *------------------------------------------------*/
+    async function startScreenCapture() {
       try {
-        // Request permission to capture the screen (video and audio)
-        const stream = await navigator.mediaDevices.getDisplayMedia({
+        // Ask for permission to capture the entire tab (video + audio)
+        displayStream = await navigator.mediaDevices.getDisplayMedia({
           video: true,
           audio: true
         });
-        screenRecorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp9" });
-        screenChunks = [];
-        screenRecorder.ondataavailable = event => {
-          if (event.data.size > 0) {
-            screenChunks.push(event.data);
-          }
+        // Create a hidden video element to play the captured stream.
+        const hiddenVideo = document.createElement('video');
+        hiddenVideo.style.display = "none";
+        hiddenVideo.srcObject = displayStream;
+        hiddenVideo.play();
+        hiddenVideo.onloadedmetadata = () => {
+          // Once metadata is loaded, start cropping.
+          startCroppedRecording(hiddenVideo);
         };
-        screenRecorder.onstop = () => {
-          const blob = new Blob(screenChunks, { type: "video/webm" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "conversation_recording.webm";
-          a.click();
-        };
-        screenRecorder.start();
       } catch (err) {
-        console.error("Error starting screen recording:", err);
+        console.error("Error starting screen capture:", err);
       }
     }
 
-    function stopScreenRecording() {
-      if (screenRecorder && screenRecorder.state !== "inactive") {
-        screenRecorder.stop();
+    function startCroppedRecording(videoElem) {
+      // Get the bounding rectangle of the videoContainer element.
+      const rect = videoContainer.getBoundingClientRect();
+      // Create a canvas with the same dimensions as the videoContainer.
+      recordingCanvas = document.createElement('canvas');
+      recordingCanvas.width = rect.width;
+      recordingCanvas.height = rect.height;
+      recordingCtx = recordingCanvas.getContext('2d');
+
+      // Calculate scaling factors: videoElem.videoWidth/innerWidth
+      const scaleX = videoElem.videoWidth / window.innerWidth;
+      const scaleY = videoElem.videoHeight / window.innerHeight;
+      // Calculate the crop coordinates (position of videoContainer relative to the full tab)
+      const cropX = rect.left * scaleX;
+      const cropY = rect.top * scaleY;
+      const cropWidth = rect.width * scaleX;
+      const cropHeight = rect.height * scaleY;
+
+      // Draw continuously using requestAnimationFrame.
+      function drawFrame() {
+        recordingCtx.drawImage(videoElem, cropX, cropY, cropWidth, cropHeight, 0, 0, recordingCanvas.width, recordingCanvas.height);
+        animationFrameId = requestAnimationFrame(drawFrame);
+      }
+      drawFrame();
+
+      // Capture the canvas stream (video only)
+      const canvasStream = recordingCanvas.captureStream(30);
+      // Add audio tracks from the original displayStream (if any)
+      displayStream.getAudioTracks().forEach(track => {
+        canvasStream.addTrack(track);
+      });
+
+      // Assign the canvas stream to a live preview video element.
+      document.getElementById("liveRecording").srcObject = canvasStream;
+
+      // Create a MediaRecorder to record the canvas stream.
+      croppedRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm; codecs=vp9" });
+      croppedChunks = [];
+      croppedRecorder.ondataavailable = event => {
+        if (event.data.size > 0) {
+          croppedChunks.push(event.data);
+        }
+      };
+      croppedRecorder.onstop = () => {
+        const blob = new Blob(croppedChunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        // Create a download link for the recorded video.
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "conversation_recording.webm";
+        a.click();
+      };
+      croppedRecorder.start();
+    }
+
+    function stopScreenCapture() {
+      if (croppedRecorder && croppedRecorder.state !== "inactive") {
+        croppedRecorder.stop();
+      }
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (displayStream) {
+        displayStream.getTracks().forEach(track => track.stop());
       }
     }
 
@@ -396,11 +443,9 @@
     /*------------------------------------------------
      * EVENT LISTENERS
      *------------------------------------------------*/
-    // Start Conversation button
     startConversationBtn.addEventListener("click", () => {
       startConversation();
     });
-    // Play/Pause button
     playPauseBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isConversationActive) {
@@ -471,7 +516,7 @@
     }
 
     /*------------------------------------------------
-     * MAIN CONVERSATION FLOW
+     * MAIN CONVERSATION FLOW (Unchanged Logic)
      *------------------------------------------------*/
     async function startConversation() {
       const jobRole = jobRoleInput.value.trim();
@@ -479,8 +524,8 @@
         alert("Please enter a job title first.");
         return;
       }
-      // Start screen recording when conversation begins.
-      startScreenRecording();
+      // Start screen capture (this will ask permission and record only the videoContainer area)
+      startScreenCapture();
       
       isConversationActive = true;
       isPaused = false;
@@ -514,8 +559,8 @@
         clearTimeout(timeoutHandle);
         timeoutHandle = null;
       }
-      // Stop screen recording and download the video file.
-      stopScreenRecording();
+      // Stop the cropped screen capture and recording.
+      stopScreenCapture();
     }
 
     function startTimeout() {
@@ -542,7 +587,7 @@
     }
 
     /*------------------------------------------------
-     * SENDING/RECEIVING MESSAGES WITH RETRY LOGIC
+     * SENDING/RECEIVING MESSAGES WITH RETRY LOGIC (Unchanged)
      *------------------------------------------------*/
     async function sendMessage(serverUrl, history, serverLabel, retries = 3) {
       if (!isConversationActive) return;
@@ -610,7 +655,7 @@
     }
 
     /*------------------------------------------------
-     * UI HELPERS
+     * UI HELPERS (Unchanged)
      *------------------------------------------------*/
     function addMessageToUI(sender, text, cssClass) {
       const msgDiv = document.createElement("div");
@@ -619,7 +664,6 @@
       conversationEl.appendChild(msgDiv);
       conversationEl.scrollTop = conversationEl.scrollHeight;
 
-      // Also update the transcript container
       const transcriptMsg = document.createElement("div");
       transcriptMsg.classList.add("transcript-message", cssClass);
       transcriptMsg.innerHTML = `<strong>${sender}:</strong> ${text}`;
@@ -627,7 +671,7 @@
     }
 
     /*------------------------------------------------
-     * SPEECH SYNTHESIS with Word-By-Word Typewriter Effect
+     * SPEECH SYNTHESIS with Word-By-Word Typewriter Effect (Unchanged)
      *------------------------------------------------*/
     function splitText(text, maxLength = 200) {
       const sentences = text.match(/[^\.!\?]+[\.!\?]+/g);
@@ -656,7 +700,6 @@
       bubbleEl.style.display = "block";
       bubbleEl.classList.add("speaking");
 
-      // Create a live transcript element for the spoken message
       const liveTranscriptElem = document.createElement("div");
       liveTranscriptElem.classList.add("transcript-message");
       liveTranscriptElem.classList.add(voiceLabel === "Interviewer" ? "assistant" : "user");
@@ -720,7 +763,7 @@
     }
 
     /*------------------------------------------------
-     * DOWNLOAD FINAL HTML (Transcript)
+     * DOWNLOAD FINAL HTML (Transcript) (Unchanged)
      *------------------------------------------------*/
     function downloadInterviewHTML() {
       let transcriptHTML = "";
