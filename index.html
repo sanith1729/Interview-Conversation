@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- Import Inter font from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interview Conversation - Video Style</title>
+  <title>Interview Conversation - Video Style with Recording</title>
   <style>
     /* Base resets and full-screen background */
     html, body {
@@ -11,7 +13,9 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      font-family: Arial, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f8f9fa;
+      color: #202123;
     }
     /* Outer container centering the video player and warning message */
     .outer-wrapper {
@@ -19,8 +23,6 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      height: auto;
-      overflow: hidden;
       padding: 20px;
     }
     /* Video container with 16:9 ratio and background image */
@@ -28,7 +30,7 @@
       position: relative;
       width: 80%;
       max-width: 1000px;
-      background: #000 url("https://storage.googleapis.com/vdbimagesbucket/vecteezy_isometric-style-illustration-discussion-of-success-and-life_6470782.jpg") center center/cover no-repeat;
+      background: #000 url("https://storage.googleapis.com/vdbimagesbucket/Screenshot%202025-03-25%20at%209.35.00%E2%80%AFPM.png") center center/cover no-repeat;
       padding-bottom: 56.25%; /* 16:9 ratio */
       overflow: hidden;
       border: 1px solid #333;
@@ -46,11 +48,11 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      pointer-events: none; /* So container clicks pass through */
+      pointer-events: none;
     }
     /* Play/Pause button styling */
     #playPauseBtn {
-      pointer-events: auto; /* Enable clicks on button */
+      pointer-events: auto;
       background-color: rgba(0,0,0,0.6);
       color: #fff;
       font-size: 2rem;
@@ -80,7 +82,7 @@
     #status {
       display: none;
     }
-    /* Error/Warning message styling – light black text under the video */
+    /* Error/Warning message styling */
     #errorMessage,
     #tabWarning {
       display: none;
@@ -111,7 +113,111 @@
       font-size: 1rem;
       cursor: pointer;
     }
-    /* New conversation start input styling */
+    /*
+     * Caption Bubbles (for on-screen speaking text)
+     */
+    #interviewerCaption, #candidateCaption {
+      position: absolute;
+      top: 35%;
+      width: 220px;
+      padding: 14px 18px;
+      border-radius: 24px;
+      font-size: 0.8rem;
+      font-weight: 400;
+      line-height: 1.4;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+      pointer-events: none;
+      display: none;
+      z-index: 10;
+      font-family: 'Inter', sans-serif;
+    }
+    /* Interviewer caption bubble uses the image background */
+    #interviewerCaption {
+      left: 8%;
+      color: #E1E1E1;
+      background: url("https://storage.googleapis.com/vdbimagesbucket/Screenshot%202025-04-01%20at%2010.49.01%E2%80%AFPM.png") no-repeat center center;
+      background-size: 100% 100%;
+    }
+    /* Candidate caption bubble uses a solid background color */
+    #candidateCaption {
+      right: 8%;
+      background: #f2f2f2;
+      color: #0d0d0d;
+    }
+    /* Arrow styles - hidden by default */
+    #interviewerCaption::after,
+    #candidateCaption::after {
+      content: "";
+      display: none;
+    }
+    /* Arrow styles when speaking (using the "speaking" class) */
+    #interviewerCaption.speaking::after,
+    #candidateCaption.speaking::after {
+      display: block;
+      position: absolute;
+      top: 100%;
+      width: 0;
+      height: 0;
+      border: 10px solid transparent;
+      border-top-color: #f9f9f9;
+    }
+    /* For the interviewer, position the arrow to the left */
+    #interviewerCaption.speaking::after {
+      left: 20px;
+    }
+    /* For the candidate, position the arrow to the right */
+    #candidateCaption.speaking::after {
+      right: 20px;
+    }
+    /* Transcript container with ChatGPT-like styling */
+    .transcript-container {
+      margin: 20px auto;
+      max-width: 1000px;
+      padding: 20px;
+      background-color: #f9f9f9;
+      border: 1px solid #d1d5da;
+      border-radius: 8px;
+    }
+    .transcript-container h2 {
+      text-align: center;
+      color: #202123;
+      margin-bottom: 20px;
+    }
+    /* Transcript messages styled like ChatGPT bubbles */
+    .transcript-message {
+      margin: 8px 0;
+      padding: 12px 16px;
+      border: 1px solid #d1d5da;
+      border-radius: 8px;
+      max-width: 60%;
+      word-wrap: break-word;
+    }
+    /* Assistant (Interviewer) messages get a light gray background */
+    .transcript-message.assistant {
+      background-color: #f7f7f8;
+      text-align: left;
+      margin-right: auto;
+    }
+    /* Candidate (User) messages use a black background with white text */
+    .transcript-message.user {
+      background-color: #000;
+      color: #fff;
+      text-align: right;
+      margin-left: auto;
+    }
+    .transcript-message.system {
+      text-align: center;
+      margin: 0 auto;
+      max-width: 90%;
+      background-color: #f6f8fa;
+    }
+    /* Clearfix for transcript container */
+    .transcript-container::after {
+      content: "";
+      display: table;
+      clear: both;
+    }
+    /* Conversation start styling */
     .conversation-start {
       margin-top: 20px;
       text-align: center;
@@ -125,37 +231,6 @@
       padding: 10px 20px;
       font-size: 1rem;
       margin-left: 10px;
-    }
-    /* Talk bubbles for Interviewer & Candidate captions */
-    #interviewerCaption {
-      position: absolute;
-      top: 6%;
-      left: 0%;
-      width: 30%;
-      background: #05A67E;
-      color: #fff;
-      padding: 10px;
-      border-radius: 8px;
-      text-align: center;
-      pointer-events: none;
-      font-size: 1.1rem;
-      display: none;
-      box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
-    }
-    #candidateCaption {
-      position: absolute;
-      top: 5%;
-      right: 0%;
-      width: 30%;
-      background: #F9C95D;
-      color: #000;
-      padding: 10px;
-      border-radius: 8px;
-      text-align: center;
-      pointer-events: none;
-      font-size: 1.1rem;
-      display: none;
-      box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
     }
   </style>
 </head>
@@ -179,34 +254,45 @@
         <button id="stopBtn">Stop Conversation</button>
         <button id="downloadBtn">Download Interview HTML</button>
       </div>
-      <!-- Separate caption bubbles for each person -->
+      <!-- Caption bubbles -->
       <div id="interviewerCaption"></div>
       <div id="candidateCaption"></div>
-      <!-- (Hidden) Conversation transcript log -->
+      <!-- Hidden conversation transcript log -->
       <div id="conversation"></div>
       <p id="status">Idle...</p>
       <p id="errorMessage"></p>
     </div>
-    <!-- New conversation start input under the video container -->
+    <!-- Conversation start input -->
     <div class="conversation-start">
       <input type="text" id="jobRole" placeholder="Enter job title to start conversation" />
       <button id="startConversationBtn">Start Conversation</button>
     </div>
-    <!-- Warning message that shows when the user changes tab -->
-    <p id="tabWarning">
-      Warning: Changing tabs during the interview may stop the interview.
-    </p>
+    <!-- Tab Warning Element -->
+    <p id="tabWarning">Warning: Changing tabs during the interview may stop the interview.</p>
   </div>
 
+  <!-- Transcript Container for Live Conversation Display -->
+  <div class="transcript-container">
+    <h2>Interview Transcript</h2>
+    <div id="transcriptBox"></div>
+  </div>
+
+  <!-- Hidden canvas used for recording the video container -->
+  <canvas id="recordCanvas" style="display: none;"></canvas>
+
+  <!-- Include html2canvas from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
   <script>
-    /* --------------------------
-     *  CONFIG & GLOBALS
-     * -------------------------- */
+    /*------------------------------------------------
+     * CONFIG & GLOBALS
+     *------------------------------------------------*/
     const INTERVIEWER_ENDPOINT = "https://travel.storieswhiletravelling.com/api";
     const MAIN_ENDPOINT = "https://candidate.storieswhiletravelling.com/api";
 
     // UI Elements
     const jobRoleInput = document.getElementById("jobRole");
+    const startConversationBtn = document.getElementById("startConversationBtn");
     const playPauseBtn = document.getElementById("playPauseBtn");
     const stopBtn = document.getElementById("stopBtn");
     const downloadBtn = document.getElementById("downloadBtn");
@@ -217,13 +303,13 @@
     const browserWarning = document.getElementById("browserWarning");
     const dismissWarningBtn = document.getElementById("dismissWarningBtn");
     const tabWarningEl = document.getElementById("tabWarning");
-    const startConversationBtn = document.getElementById("startConversationBtn");
+    const transcriptBox = document.getElementById("transcriptBox");
 
-    // Caption bubbles for interviewer/candidate
+    // Caption bubbles
     const interviewerCaptionEl = document.getElementById("interviewerCaption");
     const candidateCaptionEl = document.getElementById("candidateCaption");
 
-    // Voice selection elements (still available but not used for TTS API)
+    // Voice selection elements
     const voiceSelectOne = document.getElementById("voiceSelectOne");
     const voiceSelectTwo = document.getElementById("voiceSelectTwo");
 
@@ -231,21 +317,66 @@
     let isConversationActive = false;
     let isPaused = false;
     let conversationTurn = 0;
-    const MAX_TURNS = 29; 
+    const MAX_TURNS = 29;
     let conversationStartTime = null;
     let timeoutHandle = null;
 
-    // Global conversation history (for transcript)
+    // Global conversation history
     const conversationHistory = [];
 
-    // Voices-related (if needed for other parts)
+    // Voices-related
     let voices = [];
-    let selectedVoiceOne = null; // Interviewer
-    let selectedVoiceTwo = null; // Candidate
+    let selectedVoiceOne = null; // Interviewer (male voice)
+    let selectedVoiceTwo = null; // Candidate (female voice)
 
-    /* ---------------------------
-     *  BROWSER COMPATIBILITY & VISIBILITY CHECK
-     * --------------------------- */
+    /*------------------------------------------------
+     * RECORDING VARIABLES & FUNCTIONS
+     *------------------------------------------------*/
+    // Canvas for recording
+    const recordCanvas = document.getElementById("recordCanvas");
+    const recordCtx = recordCanvas.getContext("2d");
+    recordCanvas.width = 1280;
+    recordCanvas.height = 720;
+
+    // Capture the canvas stream at 30fps
+    const stream = recordCanvas.captureStream(30);
+    let mediaRecorder = new MediaRecorder(stream, { mimeType: "video/webm; codecs=vp9" });
+    let recordedChunks = [];
+    let recordInterval;
+
+    mediaRecorder.ondataavailable = function(e) {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = function() {
+      const blob = new Blob(recordedChunks, { type: "video/webm" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "interview_video.webm";
+      a.click();
+    };
+
+    function startRecording() {
+      recordedChunks = [];
+      mediaRecorder.start();
+      // Continuously capture snapshots of the videoContainer
+      recordInterval = setInterval(() => {
+        html2canvas(videoContainer).then(canvasSnapshot => {
+          recordCtx.clearRect(0, 0, recordCanvas.width, recordCanvas.height);
+          recordCtx.drawImage(canvasSnapshot, 0, 0, recordCanvas.width, recordCanvas.height);
+        });
+      }, 1000/30); // Approximately 30fps
+    }
+
+    function stopRecording() {
+      clearInterval(recordInterval);
+      mediaRecorder.stop();
+    }
+
+    /*------------------------------------------------
+     * BROWSER COMPATIBILITY & VISIBILITY CHECK
+     *------------------------------------------------*/
     const isChrome = /Chrome/.test(navigator.userAgent) && /Google Inc/.test(navigator.vendor);
     if (!isChrome) {
       browserWarning.style.display = "flex";
@@ -264,25 +395,23 @@
       }
     });
 
-    /* ---------------------------
-     *  EVENT LISTENERS
-     * --------------------------- */
-    playPauseBtn.addEventListener("click", function(e) {
+    /*------------------------------------------------
+     * EVENT LISTENERS
+     *------------------------------------------------*/
+    startConversationBtn.addEventListener("click", () => {
+      startConversation();
+    });
+    playPauseBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isConversationActive) {
-        // With OpenAI TTS, pausing/resuming is managed by the audio element.
-        // You could implement additional logic if needed.
+        togglePlayPause();
       }
     });
     stopBtn.addEventListener("click", stopConversation);
     downloadBtn.addEventListener("click", downloadInterviewHTML);
-    startConversationBtn.addEventListener("click", startConversation);
-
     window.addEventListener('beforeunload', () => {
-      // Cancel any pending audio if needed
+      speechSynthesis.cancel();
     });
-
-    // (Optional) Voice selection change events if you want to update local variables
     voiceSelectOne.addEventListener("change", () => {
       const index = voiceSelectOne.selectedOptions[0]?.getAttribute("data-voice-index");
       selectedVoiceOne = voices[index] || null;
@@ -291,8 +420,11 @@
       const index = voiceSelectTwo.selectedOptions[0]?.getAttribute("data-voice-index");
       selectedVoiceTwo = voices[index] || null;
     });
+    initializeVoices();
 
-    // Initialize voices on load (if needed)
+    /*------------------------------------------------
+     * VOICE INITIALIZATION
+     *------------------------------------------------*/
     function initializeVoices() {
       voices = window.speechSynthesis.getVoices();
       if (voices.length !== 0) {
@@ -318,6 +450,7 @@
         };
       }
     }
+
     function populateVoiceList(selectEl, defaultVoice) {
       selectEl.innerHTML = "";
       voices.forEach((voice, index) => {
@@ -336,22 +469,23 @@
         selectEl.disabled = true;
       }
     }
-    initializeVoices();
 
-    /* ---------------------------
-     *  MAIN CONVERSATION FLOW
-     * --------------------------- */
+    /*------------------------------------------------
+     * MAIN CONVERSATION FLOW
+     *------------------------------------------------*/
     async function startConversation() {
       const jobRole = jobRoleInput.value.trim();
       if (!jobRole) {
         alert("Please enter a job title first.");
         return;
       }
-      document.querySelector('.conversation-start').style.display = 'none';
+      // Start recording when conversation begins
+      startRecording();
+
       isConversationActive = true;
+      isPaused = false;
       conversationTurn = 0;
       conversationStartTime = Date.now();
-
       statusEl.textContent = "Conversation Started";
       errorEl.textContent = "";
       playPauseBtn.style.display = "none";
@@ -363,7 +497,6 @@
       const firstMessage = `I am applying for a ${jobRole}`;
       addMessageToUI("Candidate", firstMessage, "user");
       conversationHistory.push({ role: "user", content: firstMessage });
-
       startTimeout();
       sendMessage(INTERVIEWER_ENDPOINT, conversationHistory, "Interviewer");
     }
@@ -371,7 +504,8 @@
     function stopConversation(reason = "The conversation has been stopped.") {
       if (!isConversationActive) return;
       isConversationActive = false;
-      // Stop any ongoing audio if necessary
+      isPaused = false;
+      speechSynthesis.cancel();
       playPauseBtn.style.display = "block";
       playPauseBtn.textContent = "▶";
       statusEl.textContent = "Conversation Stopped";
@@ -380,6 +514,8 @@
         clearTimeout(timeoutHandle);
         timeoutHandle = null;
       }
+      // Stop recording and trigger download of the video file
+      stopRecording();
     }
 
     function startTimeout() {
@@ -391,9 +527,23 @@
       }, timeoutDuration);
     }
 
-    /* ---------------------------
-     *  SENDING/RECEIVING MESSAGES WITH RETRY LOGIC
-     * --------------------------- */
+    function togglePlayPause() {
+      if (!isConversationActive) return;
+      if (!isPaused) {
+        speechSynthesis.pause();
+        isPaused = true;
+        playPauseBtn.style.display = "block";
+        playPauseBtn.textContent = "▶";
+      } else {
+        speechSynthesis.resume();
+        isPaused = false;
+        playPauseBtn.style.display = "none";
+      }
+    }
+
+    /*------------------------------------------------
+     * SENDING/RECEIVING MESSAGES WITH RETRY LOGIC
+     *------------------------------------------------*/
     async function sendMessage(serverUrl, history, serverLabel, retries = 3) {
       if (!isConversationActive) return;
       if (conversationTurn >= MAX_TURNS) {
@@ -430,8 +580,7 @@
         if (!data.reply) throw new Error("Server reply missing 'reply' field.");
         const sanitizedReply = sanitizeMessage(data.reply);
 
-        // Use OpenAI TTS instead of native speech synthesis:
-        speakTextOpenAI(sanitizedReply, serverLabel, () => {
+        speakText(sanitizedReply, serverLabel, () => {
           if (!isConversationActive) return;
           conversationTurn++;
           const role = (serverLabel === "Interviewer") ? "assistant" : "user";
@@ -460,67 +609,119 @@
       return text.trim();
     }
 
-    /* ---------------------------
-     *  UI HELPERS
-     * --------------------------- */
+    /*------------------------------------------------
+     * UI HELPERS
+     *------------------------------------------------*/
     function addMessageToUI(sender, text, cssClass) {
       const msgDiv = document.createElement("div");
       msgDiv.classList.add("message", cssClass);
       msgDiv.textContent = `${sender}: ${text}`;
       conversationEl.appendChild(msgDiv);
       conversationEl.scrollTop = conversationEl.scrollHeight;
+
+      // Also update the transcript container
+      const transcriptMsg = document.createElement("div");
+      transcriptMsg.classList.add("transcript-message", cssClass);
+      transcriptMsg.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      transcriptBox.appendChild(transcriptMsg);
     }
 
-    /* ---------------------------
-     *  OPENAI TEXT-TO-SPEECH FUNCTION
-     * ---------------------------
-     * This function calls the OpenAI TTS endpoint, plays back the resulting audio,
-     * and triggers a callback when finished.
-     */
-    async function speakTextOpenAI(text, voiceLabel, callback) {
-      // Choose a voice based on role – available voices may be: alloy, echo, fable, onyx, nova, shimmer
-      const voice = (voiceLabel === "Interviewer") ? "onyx" : "nova";
-      // WARNING: Do not expose your API key in production code!
-      const apiKey = "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";
+    /*------------------------------------------------
+     * SPEECH SYNTHESIS with Word-By-Word Typewriter Effect
+     *------------------------------------------------*/
+    function splitText(text, maxLength = 200) {
+      const sentences = text.match(/[^\.!\?]+[\.!\?]+/g);
+      if (!sentences) return [text];
+      const chunks = [];
+      let currentChunk = '';
+      sentences.forEach(sentence => {
+        if ((currentChunk + sentence).length > maxLength) {
+          if (currentChunk.length > 0) {
+            chunks.push(currentChunk.trim());
+            currentChunk = '';
+          }
+        }
+        currentChunk += sentence + ' ';
+      });
+      if (currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+      }
+      return chunks;
+    }
 
-      try {
-        const response = await fetch("https://api.openai.com/v1/audio/speech", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "tts-1",
-            input: text,
-            voice: voice
-          })
-        });
-        if (!response.ok) {
-          console.error("TTS API failed:", await response.text());
+    function speakText(text, voiceLabel, callback) {
+      const chunks = splitText(text, 200);
+      let chunkIndex = 0;
+      const bubbleEl = (voiceLabel === "Interviewer") ? interviewerCaptionEl : candidateCaptionEl;
+      bubbleEl.style.display = "block";
+      bubbleEl.classList.add("speaking");
+
+      // Create a live transcript element for the spoken message
+      const liveTranscriptElem = document.createElement("div");
+      liveTranscriptElem.classList.add("transcript-message");
+      liveTranscriptElem.classList.add(voiceLabel === "Interviewer" ? "assistant" : "user");
+      transcriptBox.appendChild(liveTranscriptElem);
+
+      function speakNextChunk() {
+        if (chunkIndex >= chunks.length) {
+          bubbleEl.classList.remove("speaking");
           if (callback) callback();
           return;
         }
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audio.onended = () => {
-          if (callback) callback();
+        
+        const chunk = chunks[chunkIndex];
+        const words = chunk.split(" ");
+        let wordIndex = 0;
+        let displayedText = "";
+        let timerFinished = false;
+        let timerId = null;
+
+        const utterance = new SpeechSynthesisUtterance(chunk);
+        if (voiceLabel === "Interviewer" && selectedVoiceOne) {
+          utterance.voice = selectedVoiceOne;
+        } else if (voiceLabel === "Candidate" && selectedVoiceTwo) {
+          utterance.voice = selectedVoiceTwo;
+        }
+        utterance.rate = 0.96;
+        
+        utterance.onend = () => {
+          if (!timerFinished) {
+            clearInterval(timerId);
+            bubbleEl.textContent = chunk;
+            liveTranscriptElem.innerHTML = `<strong>${voiceLabel}:</strong> ${chunk}`;
+          }
+          chunkIndex++;
+          speakNextChunk();
         };
-        audio.onerror = (e) => {
-          console.error("Audio playback error:", e);
-          if (callback) callback();
+        
+        utterance.onerror = (e) => {
+          console.error("Speech synthesis error:", e.error);
+          clearInterval(timerId);
+          chunkIndex++;
+          speakNextChunk();
         };
-        audio.play();
-      } catch (error) {
-        console.error("Error in TTS call:", error);
-        if (callback) callback();
+        
+        speechSynthesis.speak(utterance);
+        
+        timerId = setInterval(() => {
+          if (wordIndex < words.length) {
+            displayedText += (displayedText ? " " : "") + words[wordIndex];
+            bubbleEl.textContent = displayedText;
+            liveTranscriptElem.innerHTML = `<strong>${voiceLabel}:</strong> ${displayedText}`;
+            wordIndex++;
+          } else {
+            timerFinished = true;
+            clearInterval(timerId);
+          }
+        }, 300);
       }
+      
+      speakNextChunk();
     }
 
-    /* ---------------------------
-     *  DOWNLOAD FINAL HTML (Transcript)
-     * --------------------------- */
+    /*------------------------------------------------
+     * DOWNLOAD FINAL HTML (Transcript)
+     *------------------------------------------------*/
     function downloadInterviewHTML() {
       let transcriptHTML = "";
       conversationHistory.forEach(msg => {
@@ -535,8 +736,13 @@
   <meta charset="UTF-8">
   <title>Interview Transcript</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h1 { color: #1b6f9a; }
+    body { 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+      padding: 20px; 
+      background: #f8f9fa; 
+      color: #202123; 
+    }
+    h1 { color: #202123; }
     p { margin: 6px 0; }
   </style>
 </head>
@@ -557,3 +763,4 @@
   </script>
 </body>
 </html>
+
