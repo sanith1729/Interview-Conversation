@@ -5,7 +5,7 @@
   <!-- Import Inter font from Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Interview Conversation - Video Style with Cropped Recording</title>
+  <title>Interview Conversation - Video Style</title>
   <style>
     /* Base resets and full-screen background */
     html, body {
@@ -228,15 +228,6 @@
       font-size: 1rem;
       margin-left: 10px;
     }
-    /* Live recording preview video */
-    #liveRecording {
-      margin: 20px auto;
-      display: block;
-      width: 80%;
-      max-width: 1000px;
-      border: 1px solid #333;
-      border-radius: 6px;
-    }
   </style>
 </head>
 <body>
@@ -249,7 +240,9 @@
   <div class="outer-wrapper">
     <div class="video-container" id="videoContainer">
       <div class="content-overlay">
+        <!-- Play/Pause button; initially visible -->
         <button id="playPauseBtn">▶</button>
+        <!-- Voice selection (hidden) -->
         <div class="voice-section">
           <select id="voiceSelectOne"></select>
           <select id="voiceSelectTwo"></select>
@@ -257,36 +250,37 @@
         <button id="stopBtn">Stop Conversation</button>
         <button id="downloadBtn">Download Interview HTML</button>
       </div>
+      <!-- Caption bubbles -->
       <div id="interviewerCaption"></div>
       <div id="candidateCaption"></div>
+      <!-- Hidden conversation transcript log -->
       <div id="conversation"></div>
       <p id="status">Idle...</p>
       <p id="errorMessage"></p>
     </div>
+    <!-- Conversation start input -->
     <div class="conversation-start">
       <input type="text" id="jobRole" placeholder="Enter job title to start conversation" />
       <button id="startConversationBtn">Start Conversation</button>
     </div>
+    <!-- Tab Warning Element -->
     <p id="tabWarning">Warning: Changing tabs during the interview may stop the interview.</p>
   </div>
 
+  <!-- Transcript Container for Live Conversation Display -->
   <div class="transcript-container">
     <h2>Interview Transcript</h2>
     <div id="transcriptBox"></div>
   </div>
 
-  <!-- Live preview of the cropped recording -->
-  <video id="liveRecording" controls autoplay muted></video>
-
-  <!-- The hidden canvas used for cropped recording will be created dynamically -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script>
     /*------------------------------------------------
-     * GLOBAL VARIABLES FOR CONVERSATION (Unchanged)
+     * CONFIG & GLOBALS
      *------------------------------------------------*/
     const INTERVIEWER_ENDPOINT = "https://travel.storieswhiletravelling.com/api";
     const MAIN_ENDPOINT = "https://candidate.storieswhiletravelling.com/api";
 
+    // UI Elements
     const jobRoleInput = document.getElementById("jobRole");
     const startConversationBtn = document.getElementById("startConversationBtn");
     const playPauseBtn = document.getElementById("playPauseBtn");
@@ -301,123 +295,29 @@
     const tabWarningEl = document.getElementById("tabWarning");
     const transcriptBox = document.getElementById("transcriptBox");
 
+    // Caption bubbles
     const interviewerCaptionEl = document.getElementById("interviewerCaption");
     const candidateCaptionEl = document.getElementById("candidateCaption");
 
+    // Voice selection elements
     const voiceSelectOne = document.getElementById("voiceSelectOne");
     const voiceSelectTwo = document.getElementById("voiceSelectTwo");
 
+    // Conversation Control
     let isConversationActive = false;
     let isPaused = false;
     let conversationTurn = 0;
     const MAX_TURNS = 29;
     let conversationStartTime = null;
     let timeoutHandle = null;
+
+    // Global conversation history
     const conversationHistory = [];
+
+    // Voices-related
     let voices = [];
-    let selectedVoiceOne = null;
-    let selectedVoiceTwo = null;
-
-    /*------------------------------------------------
-     * GLOBAL VARIABLES FOR CROPPED RECORDING
-     *------------------------------------------------*/
-    let displayStream = null;
-    let croppedRecorder = null;
-    let croppedChunks = [];
-    let recordingCanvas = null;
-    let recordingCtx = null;
-    let animationFrameId = null;
-
-    /*------------------------------------------------
-     * SCREEN RECORDING FUNCTIONS (CROPPED TO videoContainer)
-     *------------------------------------------------*/
-    async function startScreenCapture() {
-      try {
-        // Ask for permission to capture the entire tab (video + audio)
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true
-        });
-        // Create a hidden video element to play the captured stream.
-        const hiddenVideo = document.createElement('video');
-        hiddenVideo.style.display = "none";
-        hiddenVideo.srcObject = displayStream;
-        hiddenVideo.play();
-        hiddenVideo.onloadedmetadata = () => {
-          // Once metadata is loaded, start cropping.
-          startCroppedRecording(hiddenVideo);
-        };
-      } catch (err) {
-        console.error("Error starting screen capture:", err);
-      }
-    }
-
-    function startCroppedRecording(videoElem) {
-      // Get the bounding rectangle of the videoContainer element.
-      const rect = videoContainer.getBoundingClientRect();
-      // Create a canvas with the same dimensions as the videoContainer.
-      recordingCanvas = document.createElement('canvas');
-      recordingCanvas.width = rect.width;
-      recordingCanvas.height = rect.height;
-      recordingCtx = recordingCanvas.getContext('2d');
-
-      // Calculate scaling factors: videoElem.videoWidth/innerWidth
-      const scaleX = videoElem.videoWidth / window.innerWidth;
-      const scaleY = videoElem.videoHeight / window.innerHeight;
-      // Calculate the crop coordinates (position of videoContainer relative to the full tab)
-      const cropX = rect.left * scaleX;
-      const cropY = rect.top * scaleY;
-      const cropWidth = rect.width * scaleX;
-      const cropHeight = rect.height * scaleY;
-
-      // Draw continuously using requestAnimationFrame.
-      function drawFrame() {
-        recordingCtx.drawImage(videoElem, cropX, cropY, cropWidth, cropHeight, 0, 0, recordingCanvas.width, recordingCanvas.height);
-        animationFrameId = requestAnimationFrame(drawFrame);
-      }
-      drawFrame();
-
-      // Capture the canvas stream (video only)
-      const canvasStream = recordingCanvas.captureStream(30);
-      // Add audio tracks from the original displayStream (if any)
-      displayStream.getAudioTracks().forEach(track => {
-        canvasStream.addTrack(track);
-      });
-
-      // Assign the canvas stream to a live preview video element.
-      document.getElementById("liveRecording").srcObject = canvasStream;
-
-      // Create a MediaRecorder to record the canvas stream.
-      croppedRecorder = new MediaRecorder(canvasStream, { mimeType: "video/webm; codecs=vp9" });
-      croppedChunks = [];
-      croppedRecorder.ondataavailable = event => {
-        if (event.data.size > 0) {
-          croppedChunks.push(event.data);
-        }
-      };
-      croppedRecorder.onstop = () => {
-        const blob = new Blob(croppedChunks, { type: "video/webm" });
-        const url = URL.createObjectURL(blob);
-        // Create a download link for the recorded video.
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "conversation_recording.webm";
-        a.click();
-      };
-      croppedRecorder.start();
-    }
-
-    function stopScreenCapture() {
-      if (croppedRecorder && croppedRecorder.state !== "inactive") {
-        croppedRecorder.stop();
-      }
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-      if (displayStream) {
-        displayStream.getTracks().forEach(track => track.stop());
-      }
-    }
+    let selectedVoiceOne = null; // Interviewer (male voice)
+    let selectedVoiceTwo = null; // Candidate (female voice)
 
     /*------------------------------------------------
      * BROWSER COMPATIBILITY & VISIBILITY CHECK
@@ -443,9 +343,11 @@
     /*------------------------------------------------
      * EVENT LISTENERS
      *------------------------------------------------*/
+    // Start Conversation button
     startConversationBtn.addEventListener("click", () => {
       startConversation();
     });
+    // Play/Pause button
     playPauseBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (isConversationActive) {
@@ -516,7 +418,7 @@
     }
 
     /*------------------------------------------------
-     * MAIN CONVERSATION FLOW (Unchanged Logic)
+     * MAIN CONVERSATION FLOW
      *------------------------------------------------*/
     async function startConversation() {
       const jobRole = jobRoleInput.value.trim();
@@ -524,9 +426,6 @@
         alert("Please enter a job title first.");
         return;
       }
-      // Start screen capture (this will ask permission and record only the videoContainer area)
-      startScreenCapture();
-      
       isConversationActive = true;
       isPaused = false;
       conversationTurn = 0;
@@ -559,8 +458,6 @@
         clearTimeout(timeoutHandle);
         timeoutHandle = null;
       }
-      // Stop the cropped screen capture and recording.
-      stopScreenCapture();
     }
 
     function startTimeout() {
@@ -587,7 +484,7 @@
     }
 
     /*------------------------------------------------
-     * SENDING/RECEIVING MESSAGES WITH RETRY LOGIC (Unchanged)
+     * SENDING/RECEIVING MESSAGES WITH RETRY LOGIC
      *------------------------------------------------*/
     async function sendMessage(serverUrl, history, serverLabel, retries = 3) {
       if (!isConversationActive) return;
@@ -655,7 +552,7 @@
     }
 
     /*------------------------------------------------
-     * UI HELPERS (Unchanged)
+     * UI HELPERS
      *------------------------------------------------*/
     function addMessageToUI(sender, text, cssClass) {
       const msgDiv = document.createElement("div");
@@ -671,7 +568,7 @@
     }
 
     /*------------------------------------------------
-     * SPEECH SYNTHESIS with Word-By-Word Typewriter Effect (Unchanged)
+     * SPEECH SYNTHESIS with Word-By-Word Typewriter Effect
      *------------------------------------------------*/
     function splitText(text, maxLength = 200) {
       const sentences = text.match(/[^\.!\?]+[\.!\?]+/g);
@@ -763,7 +660,7 @@
     }
 
     /*------------------------------------------------
-     * DOWNLOAD FINAL HTML (Transcript) (Unchanged)
+     * DOWNLOAD FINAL HTML (Transcript)
      *------------------------------------------------*/
     function downloadInterviewHTML() {
       let transcriptHTML = "";
@@ -806,3 +703,4 @@
   </script>
 </body>
 </html>
+
