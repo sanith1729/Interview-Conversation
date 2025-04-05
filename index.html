@@ -307,10 +307,8 @@
     let isConversationActive = false;
     let isPaused = false;
     let conversationTurn = 0;
-    // Change maximum conversation turns to 15
-    const MAX_TURNS = 15;
+    // Removed MAX_TURNS constant and related logic
     let conversationStartTime = null;
-    let timeoutHandle = null;
 
     // Global conversation history
     const conversationHistory = [];
@@ -442,7 +440,7 @@
       const firstMessage = `I am applying for a ${jobRole}`;
       addMessageToUI("Candidate", firstMessage, "user");
       conversationHistory.push({ role: "user", content: firstMessage });
-      startTimeout();
+      // Removed startTimeout() call
       sendMessage(INTERVIEWER_ENDPOINT, conversationHistory, "Interviewer");
     }
 
@@ -455,19 +453,6 @@
       playPauseBtn.textContent = "▶";
       statusEl.textContent = "Conversation Stopped";
       addMessageToUI("System", reason, "system");
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-        timeoutHandle = null;
-      }
-    }
-
-    function startTimeout() {
-      const timeoutDuration = 12 * 60 * 1000;
-      timeoutHandle = setTimeout(() => {
-        if (isConversationActive) {
-          stopConversation("Stopped after 12 minutes.");
-        }
-      }, timeoutDuration);
     }
 
     function togglePlayPause() {
@@ -489,10 +474,6 @@
      *------------------------------------------------*/
     async function sendMessage(serverUrl, history, serverLabel, retries = 3) {
       if (!isConversationActive) return;
-      if (conversationTurn >= MAX_TURNS) {
-        stopConversation("Max conversation turns reached.");
-        return;
-      }
       try {
         // Always send the full conversation history for more accuracy
         let dataToSend = history;
