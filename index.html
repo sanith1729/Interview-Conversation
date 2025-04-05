@@ -307,7 +307,8 @@
     let isConversationActive = false;
     let isPaused = false;
     let conversationTurn = 0;
-    const MAX_TURNS = 29;
+    // Change maximum conversation turns to 15
+    const MAX_TURNS = 15;
     let conversationStartTime = null;
     let timeoutHandle = null;
 
@@ -493,15 +494,9 @@
         return;
       }
       try {
+        // Always send the full conversation history for more accuracy
         let dataToSend = history;
-        if (serverUrl === INTERVIEWER_ENDPOINT) {
-          const assistantMessages = history.filter(msg => msg.role === "assistant");
-          const userMessages = history.filter(msg => msg.role === "user");
-          const lastUserMessages = userMessages.slice(-2);
-          dataToSend = [...assistantMessages, ...lastUserMessages];
-        } else {
-          dataToSend = history.slice(-4);
-        }
+        
         const response = await fetch(serverUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -703,4 +698,5 @@
   </script>
 </body>
 </html>
+
 
