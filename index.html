@@ -11,8 +11,8 @@
     html, body {
       margin: 0;
       padding: 0;
-      height: 95%;
-      width: 95%;
+      height: 100%;
+      width: 100%;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #f8f9fa;
       color: #202123;
@@ -436,7 +436,7 @@
           "Authorization": `Bearer ${OPENAI_API_KEY}`
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",
@@ -451,9 +451,18 @@
           max_tokens: 200
         })
       })
-      .then(response => response.json())
+      .then(async (response) => {
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
+        }
+        return response.json();
+      })
       .then(data => {
-        const reply = data?.choices?.[0]?.message?.content?.trim();
+        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+          throw new Error("OpenAI did not return a valid completion.");
+        }
+        const reply = data.choices[0].message.content.trim();
         console.log("🔁 Humanized:", reply);
         return reply;
       })
