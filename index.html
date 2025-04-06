@@ -277,8 +277,12 @@
     /*------------------------------------------------
      * CONFIG & GLOBALS
      *------------------------------------------------*/
+    // Endpoints to your server (which now return the raw response)
     const INTERVIEWER_ENDPOINT = "https://travel.storieswhiletravelling.com/api";
     const MAIN_ENDPOINT = "https://candidate.storieswhiletravelling.com/api";
+
+    // OpenAI API key (WARNING: Exposing your key in frontend code is insecure)
+    const OPENAI_API_KEY = "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";
 
     // UI Elements
     const jobRoleInput = document.getElementById("jobRole");
@@ -307,10 +311,9 @@
     let isConversationActive = false;
     let isPaused = false;
     let conversationTurn = 0;
-    // Removed MAX_TURNS constant and related logic
     let conversationStartTime = null;
 
-    // Global conversation history
+    // Global conversation history (stores only the humanized responses)
     const conversationHistory = [];
 
     // Voices-related
@@ -417,6 +420,49 @@
     }
 
     /*------------------------------------------------
+     * OPENAI HUMANIZATION FUNCTION (FRONTEND)
+     *------------------------------------------------*/
+    async function humanizeWithOpenAI(text) {
+      try {
+        const prompt = `Rewrite the following to sound more natural, conversational, and human:\n\n"${text}"`;
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4",
+            messages: [
+              { role: "system", content: "You are a helpful assistant that rewrites robotic text into natural, human-sounding language." },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.85
+          }),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error.message);
+        }
+        return data.choices[0].message.content.trim();
+      } catch (err) {
+        console.error("OpenAI error:", err);
+        return text; // fallback to raw text in case of error
+      }
+    }
+
+    /*------------------------------------------------
+     * NEW HELPER: ADD MESSAGE TO TRANSCRIPT
+     * (This appends messages only to the transcript, leaving the live UI unchanged)
+     *------------------------------------------------*/
+    function addMessageToTranscript(sender, text, cssClass) {
+      const transcriptMsg = document.createElement("div");
+      transcriptMsg.classList.add("transcript-message", cssClass);
+      transcriptMsg.innerHTML = `<strong>${sender}:</strong> ${text}`;
+      transcriptBox.appendChild(transcriptMsg);
+    }
+
+    /*------------------------------------------------
      * MAIN CONVERSATION FLOW
      *------------------------------------------------*/
     async function startConversation() {
@@ -439,8 +485,9 @@
       conversationHistory.length = 0;
       const firstMessage = `I am applying for a ${jobRole}`;
       addMessageToUI("Candidate", firstMessage, "user");
+      addMessageToTranscript("Candidate", firstMessage, "user");
       conversationHistory.push({ role: "user", content: firstMessage });
-      // Removed startTimeout() call
+      // The conversation alternates between endpoints.
       sendMessage(INTERVIEWER_ENDPOINT, conversationHistory, "Interviewer");
     }
 
@@ -453,6 +500,7 @@
       playPauseBtn.textContent = "▶";
       statusEl.textContent = "Conversation Stopped";
       addMessageToUI("System", reason, "system");
+      addMessageToTranscript("System", reason, "system");
     }
 
     function togglePlayPause() {
@@ -475,7 +523,7 @@
     async function sendMessage(serverUrl, history, serverLabel, retries = 3) {
       if (!isConversationActive) return;
       try {
-        // Always send the full conversation history for more accuracy
+        // Always send the full conversation history for more accuracy.
         let dataToSend = history;
         
         const response = await fetch(serverUrl, {
@@ -496,13 +544,23 @@
         }
         const data = await response.json();
         if (!data.reply) throw new Error("Server reply missing 'reply' field.");
-        const sanitizedReply = sanitizeMessage(data.reply);
 
-        speakText(sanitizedReply, serverLabel, () => {
+        // First, sanitize the raw server reply.
+        let rawReply = sanitizeMessage(data.reply);
+        // Add the raw server response to the transcript (labeled "Server")
+        addMessageToTranscript("Server", rawReply, "assistant");
+
+        // Now, send it to OpenAI to get a human-friendly version.
+        const humanizedReply = await humanizeWithOpenAI(rawReply);
+        // Add the humanized (final) response to the transcript with the proper label.
+        addMessageToTranscript(serverLabel, humanizedReply, "assistant");
+
+        // Use only the humanized reply for speaking and updating conversation history.
+        speakText(humanizedReply, serverLabel, () => {
           if (!isConversationActive) return;
           conversationTurn++;
           const role = (serverLabel === "Interviewer") ? "assistant" : "user";
-          conversationHistory.push({ role, content: sanitizedReply });
+          conversationHistory.push({ role, content: humanizedReply });
           const nextServer = (serverUrl === INTERVIEWER_ENDPOINT) ? MAIN_ENDPOINT : INTERVIEWER_ENDPOINT;
           const nextLabel = (nextServer === INTERVIEWER_ENDPOINT) ? "Interviewer" : "Candidate";
           setTimeout(() => {
@@ -679,5 +737,3 @@
   </script>
 </body>
 </html>
-
-
